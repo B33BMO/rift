@@ -1,0 +1,35 @@
+[Unit]
+Description=Rift Mesh VPN Beacon Server
+Documentation=https://github.com/rift-vpn/rift
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/beacon --config /etc/rift/beacon.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+# Run as dedicated user
+User=rift
+Group=rift
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+# State directory
+StateDirectory=rift
+ConfigurationDirectory=rift
+RuntimeDirectory=rift
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rift-beacon
+
+[Install]
+WantedBy=multi-user.target

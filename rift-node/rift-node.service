@@ -1,0 +1,38 @@
+[Unit]
+Description=Rift Mesh VPN Node
+Documentation=https://github.com/rift-vpn/rift
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/rift-node run --config /etc/rift/rift.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+
+# Required capabilities for TUN device
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+
+# Allow access to /dev/net/tun
+DeviceAllow=/dev/net/tun rw
+
+# State directory
+StateDirectory=rift
+ConfigurationDirectory=rift
+RuntimeDirectory=rift
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rift-node
+
+[Install]
+WantedBy=multi-user.target
