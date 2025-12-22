@@ -50,7 +50,7 @@ else
     LIB_DIR="/var/lib/rift"
 fi
 
-GITHUB_REPO="bischoffdev/rift"
+GITHUB_REPO="b33bmo/rift"
 DOWNLOAD_BASE="https://bmo.guru/rift/releases"
 
 # Parse arguments
@@ -245,7 +245,7 @@ install_service_linux() {
     cat > "$SYSTEMD_DIR/rift-node.service" << 'EOF'
 [Unit]
 Description=Rift Mesh VPN Node
-Documentation=https://github.com/bischoffdev/rift
+Documentation=https://github.com/b33bmo/rift
 After=network-online.target
 Wants=network-online.target
 

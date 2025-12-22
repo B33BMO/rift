@@ -149,3 +149,15 @@ clippy:
 
 check: fmt clippy test
 	@echo "All checks passed!"
+
+# Release builds
+.PHONY: dist dist-all dist-upload
+
+dist:
+	./scripts/build-release.sh
+
+dist-all:
+	./scripts/build-release.sh --all
+
+dist-upload:
+	./scripts/build-release.sh --upload
