@@ -26,3 +26,9 @@ colored = "2.1"
 tabled = "0.15"
 dialoguer = "0.11"
 indicatif = "0.17"
+
+# System
+dirs = "5.0"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.27", features = ["signal", "user"] }
