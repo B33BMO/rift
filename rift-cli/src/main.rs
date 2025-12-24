@@ -282,6 +282,44 @@ async fn connect(config_path: &PathBuf, beacon_override: Option<String>) -> Resu
     println!("  {} {:?}", "NAT type:".dimmed(), registration.nat_type);
     println!();
 
+    // Discover peers from beacon
+    print!("  {} Discovering peers...", "●".yellow());
+    std::io::Write::flush(&mut std::io::stdout())?;
+
+    let list_msg = rift_core::protocol::Message::ListPeers;
+    let data = serde_json::to_vec(&list_msg)?;
+    socket.send(&data).await?;
+
+    let mut buf = vec![0u8; 65535];
+    let peers = match tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        socket.recv(&mut buf)
+    ).await {
+        Ok(Ok(n)) => {
+            match serde_json::from_slice::<rift_core::protocol::Message>(&buf[..n]) {
+                Ok(rift_core::protocol::Message::PeerList(peers)) => peers,
+                _ => vec![],
+            }
+        }
+        _ => vec![],
+    };
+
+    // Filter out ourselves
+    let other_peers: Vec<_> = peers.iter()
+        .filter(|p| p.virtual_ip != registration.virtual_ip)
+        .collect();
+
+    if other_peers.is_empty() {
+        println!("\r  {} No other peers online          ", "●".yellow());
+    } else {
+        println!("\r  {} Found {} peer(s)                ", "✓".green(), other_peers.len());
+        for peer in &other_peers {
+            let status = if peer.online { "online".green() } else { "offline".yellow() };
+            println!("      {} {} ({})", "→".dimmed(), peer.name, status);
+        }
+    }
+    println!();
+
     // Try to create TUN device
     print!("  {} Creating tunnel interface...", "●".yellow());
     std::io::Write::flush(&mut std::io::stdout())?;
@@ -481,12 +519,76 @@ async fn status(config_path: &PathBuf) -> Result<()> {
 
 /// List connected peers
 async fn peers() -> Result<()> {
+    use rift_core::config::Config;
+
+    let config_path = get_config_path(None);
+
     println!();
     println!("  {} {}", "Rift".cyan().bold(), "Peers".dimmed());
-    println!("  {}", "─".repeat(40).dimmed());
+    println!("  {}", "─".repeat(50).dimmed());
 
-    // TODO: Query via IPC when connected
-    println!("  {} Connect first with {}", "→".dimmed(), "rift connect".cyan());
+    // Load config to get beacon address
+    let config = match Config::load(&config_path) {
+        Ok(c) => c,
+        Err(_) => {
+            println!("  {} Not configured. Run: {}", "●".yellow(), "rift init".cyan());
+            println!();
+            return Ok(());
+        }
+    };
+
+    // Connect to beacon and list peers
+    let beacon_addr: std::net::SocketAddr = match config.beacon.address.parse() {
+        Ok(addr) => addr,
+        Err(_) => {
+            println!("  {} Invalid beacon address", "✗".red());
+            return Ok(());
+        }
+    };
+
+    let socket = tokio::net::UdpSocket::bind("0.0.0.0:0").await?;
+    socket.connect(beacon_addr).await?;
+
+    let list_msg = rift_core::protocol::Message::ListPeers;
+    let data = serde_json::to_vec(&list_msg)?;
+    socket.send(&data).await?;
+
+    let mut buf = vec![0u8; 65535];
+    let peers = match tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        socket.recv(&mut buf)
+    ).await {
+        Ok(Ok(n)) => {
+            match serde_json::from_slice::<rift_core::protocol::Message>(&buf[..n]) {
+                Ok(rift_core::protocol::Message::PeerList(peers)) => peers,
+                _ => vec![],
+            }
+        }
+        _ => {
+            println!("  {} Could not reach beacon", "✗".red());
+            println!();
+            return Ok(());
+        }
+    };
+
+    if peers.is_empty() {
+        println!("  {} No peers registered", "●".yellow());
+    } else {
+        println!("  {:<16} {:<20} {:<10}", "VIRTUAL IP".dimmed(), "NAME".dimmed(), "STATUS".dimmed());
+        println!("  {}", "─".repeat(50).dimmed());
+        for peer in &peers {
+            let status = if peer.online {
+                "online".green().to_string()
+            } else {
+                "offline".yellow().to_string()
+            };
+            println!("  {:<16} {:<20} {:<10}",
+                peer.virtual_ip.to_string(),
+                peer.name,
+                status
+            );
+        }
+    }
     println!();
 
     Ok(())
